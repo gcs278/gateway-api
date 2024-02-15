@@ -617,12 +617,16 @@ The `Name` cookie attribute can be configured via the `SessionName` field on `Se
 field is considered extended support level. This is because some implementations, such as ones supporting global load
 balancers, don't have the capability to configure the cookie name.
 
-#### TTL
+#### Expires / Max-Age
 
-The `TTL` cookie attribute may be influenced by the `AbsoluteTimeoutSeconds` field on `SessionPersistencePolicy`.
-However, it's important to understand that `AbsoluteTimeoutSeconds` represents the duration of the entire session, not
-just the cookie duration. Conversely, the cookie's `TTL` attribute does not have to be configured in order to implement
-`AbsoluteTimeoutSeconds`.
+The `Expires` and `Max-Age` cookie attributes are important in distinguishing between [session cookies and persistent
+cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#define_the_lifetime_of_a_cookie). Session cookies do
+not include either of these attributes, while persistent cookies contain one of them. Implementations that achieve
+session persistence through cookies MUST utilize session cookies, meaning that `Expires` or `Max-Age` MUST NOT be set.
+This ensures that cookies remain usable as long as the associated backend is operational and not restarted. This
+requirement is subject to review if there are use cases that require the creation of persistent cookies (utilizing
+client-side `Max-Age` or `Expires`) and/or session cookies with a lifetime or idle time timeouts (utilizing proxy-side
+cookie timeouts).
 
 #### Path
 
@@ -838,6 +842,46 @@ predicable way.
 - We need to clean up the [Implementations](#implementations) table to make it more organized and readable.
 
 ## Alternatives
+
+### Timeout Config Alternative
+
+Alternatively, timeouts such as `AbsoluteTimeoutSeconds` and `IdleTimeoutSeconds` could be added to the API. This would
+allow users to control the duration of their sessions. However, as described in [Expires / Max-Age](#expires-max-age),
+we currently prescribe that if cookies are used, then all cookies MUST be session cookies. If timeout configuration is
+added, then we also need to add an API to distinguish between session cookies and permanent cookies. This distinction is
+important because it isn't clear whether `AbsoluteTimeoutSeconds` should be the client-side `Expires` or `Max-Age`
+cookie attribute, or if it should be enforced on the proxy-side such as encoding the date in the cookie value. See issue
+[#2747](https://github.com/kubernetes-sigs/gateway-api/issues/2747) for more details.
+
+```go
+// SessionPersistence defines the desired state of
+// SessionPersistence.
+type SessionPersistence struct {
+    // SessionName defines the name of the persistent session token
+    // (e.g. a cookie name).
+    //
+    // Support: Implementation-specific
+    //
+    // +optional
+    // +kubebuilder:validation:MaxLength=4096
+    SessionName String `json:"sessionName,omitempty"`
+
+	// AbsoluteTimeoutSeconds defines the absolute timeout of the
+    // persistent session measured in seconds. Once
+    // AbsoluteTimeoutSeconds has elapsed, the session becomes invalid.
+    //
+    // +optional
+    AbsoluteTimeoutSeconds int64 `json:"absoluteTimeoutSeconds,omitempty"`
+
+    // IdleTimeoutSeconds defines the idle timeout of the
+    // persistent session measured in seconds. Once the session
+    // has been idle for more than specified IdleTimeoutSeconds
+    // duration, the session becomes invalid.
+    //
+    // +optional
+    IdleTimeoutSeconds int64 `json:"idleTimeoutSeconds,omitempty"`
+}
+```
 
 ### Alternate Session Persistence API
 
