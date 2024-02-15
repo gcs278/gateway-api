@@ -56,6 +56,18 @@ Some of the concerns of session persistence are the duration and expiration of t
 
 Session affinity, not to be confused with session persistence, uses an existing attribute of the request to consistently send to the same backend. Session affinity can be considered a weaker form of session persistence: it is not guaranteed to persist a connection to the same backend server if certain attributes of the request or the backends are changed.
 
+#### A Session vs. Session Persistence
+
+It's important to understand the subtle differences between a session and session persistence. A session is a period
+of interaction between a client and server where a client identifies itself using a session ID. Session persistence
+ensures the continuity of this session by directing the client's requests to the same backend server throughout the
+entire session. Session persistence becomes essential for load-balanced applications, but is unnecessary when only a
+single backend is in use.
+
+A session can exist without session persistence, but the session data must be accessible to every backend in the server
+pool. However, as we defined it, session persistence cannot exist without a session, as the initiation of session
+persistence also initiates a session.
+
 ### Security and Privacy Implications
 
 Session persistence can introduce security and privacy vulnerabilities if not properly implemented. These vulnerabilities can include:
