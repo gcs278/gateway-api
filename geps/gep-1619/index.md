@@ -5,20 +5,28 @@
 
 (See status definitions [here](/geps/overview/#gep-states).)
 
-## Graduation Criteria for Implementable Status
+## Graduation Criteria
+
+### Implementable
 
 This GEP was accidentally merged as Provisional before the required approval
 from 2 maintainers had been received. Before this graduates to implementable,
 we need to get at least one of @robscott or @youngnick to also approve this GEP.
 
-There are some open questions that will need to be answered before this can
-graduate:
+Before this GEP graduates to the Standard channel, we must fulfill the following criteria:
 
-1. Should we leave room in this policy to add additional concepts in the future
-   such as Session Affinity? If so, how would we adjust the naming and overall
-   scope of this policy?
-2. Should we leave room for configuring different forms of Session Persistence?
-   If so, what would that look like?
+ 1. Should we leave room in this policy to add additional concepts in the future
+    such as Session Affinity? If so, how would we adjust the naming and overall
+    scope of this policy?
+ 2. Should we leave room for configuring different forms of Session Persistence?
+    If so, what would that look like?
+    - **Answer**: No. See [API Granularity](#api-granularity) for more details.
+
+### Standard
+
+Before this GEP graduates to the Standard channel, we must fulfill the following criteria:
+
+- Sign-off from the GAMMA leads to ensure service mesh gets fully considered.
 
 ## TLDR
 
@@ -471,6 +479,10 @@ Tomcat servlets generating distinct cookies per server. In such scenarios, it is
 obstruct the existing use of cookies while enabling session persistence. Enabling particular low-level API
 configurations, like allowing customization of the cookie name, could prevent certain implementations from conforming to
 the spec. In other words, opting for a higher-level API provides better interoperability among our implementations.
+
+Furthermore, this API spec doesn't allow for specifying particular forms or types of session persistence, such as
+cookie-based or header-based session persistence. It intentionally is generic to provide flexibility for implementations
+to use the mechanism that best fits their requirements.
 
 ### Target Persona
 
