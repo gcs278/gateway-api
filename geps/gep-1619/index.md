@@ -699,6 +699,12 @@ also be set as well. This requirement is necessary because an expiration value i
 See [issue #2747](https://github.com/kubernetes-sigs/gateway-api/issues/2747) for more context regarding distinguishing
 between permanent and session cookies.
 
+#### Domain
+
+This API does not currently support configuring the cookie `Domain` attribute. Most implementations do not support
+configuring it, and the browser's default of scoping cookies to the response hostname is sufficient for most use cases.
+This can be revisited in the future for use cases such as sharing cookies across subdomains. See [Session Sharing](#session-sharing).
+
 #### Path
 
 The cookie's `Path` attribute defines the URL path that must exist in order for the client to send the `cookie` header.
@@ -714,8 +720,8 @@ and every dataplane can deliver it.
 
 While `Path=/` is broader than a route-specific path, the security impact is limited. The cookie value is an opaque
 backend identifier (e.g., an encoded IP address), not a session token containing sensitive data. A cookie with `Path=/`
-being sent to other routes on the same domain does not expose sensitive information — it only causes the receiving
-route's proxy to attempt (and fail) to use the persistence token, falling back to normal load balancing.
+being sent to other routes on the same hostname does not expose sensitive information — it can maintain session
+persistence when the route targets the same Backend, or be ignored when the selected Backend cannot use it.
 
 Users who need a cookie scoped to a specific path can configure it explicitly via the `cookie.path` field (Extended
 support). When set, `cookie.path` overrides the default `/`.
@@ -726,6 +732,30 @@ The `Secure`, `HttpOnly`, and `SameSite` cookie attributes are security-related.
 security-by-default principle and configure these attributes accordingly. This means enabling `Secure` and `HttpOnly`,
 and setting `SameSite` to `Strict`. However, in certain implementation use cases such as service mesh, secure values
 might not function as expected. In such cases, it's acceptable to make appropriate adjustments.
+
+### Session Sharing
+
+Multiple route rules or Routes referencing the same Backend can share a persistent session. For each request, the Route
+must select that Backend, and the client must send the cookie or header that established the session:
+
+#### Cookie-Based Session Sharing
+
+For cookie-based session sharing, the browser must reuse the same cookie across requests. That cookie is identified by
+its `(name, domain, path)` tuple:
+
+- **Domain:** Not configurable through this API. Without a `Domain` attribute, the browser uses the hostname in its
+  request URL.
+- **Path:** Configurable. Defaults to `/`.
+- **Name:** Configurable. Unique by default.
+
+Domain and Path control whether the browser sends a cookie, while the Gateway uses its name to identify it. If these
+attributes align and the Gateway selects the same Backend, the persistent session will be shared. If it selects a
+different Backend, the shared cookie name may cause a [Session Naming Collision](#session-naming-collision).
+
+#### Header-Based Session Sharing
+
+The client must explicitly send the same persistence header name and value on both requests. Headers have no
+browser-managed domain or path scope, so sharing can span hostnames if the client sends the header.
 
 ### Session Persistence API with GAMMA
 
@@ -809,9 +839,13 @@ spec:
         name: split-route-cookie
 ```
 
-This is an invalid configuration as two separate sessions cannot have the same cookie name. Implementations SHOULD
-address this scenario in manner they deem appropriate. Implementations MAY choose to reject the configuration, or they
-MAY non-deterministically allow one cookie to work (e.g. whichever cookie is configured first).
+The selected Backend may replace the cookie set by the other Backend, disrupting session persistence for the client.
+The same collision can occur across route rules or Routes serving the same hostname, regardless of namespace
+or Gateway, even when they match different paths: a client visiting both may receive competing cookies. A traffic split
+is one way this can happen on successive requests to a single path. Session persistence still applies only after a
+Backend is selected; it does not override traffic splitting. Clients that send the same persistence header to different
+Backends may encounter similar conflicts, but browsers do not send such headers automatically. Users should avoid
+reusing a session name across different Backends that serve the same clients.
 
 #### Traffic Splitting with Session Persistence
 
